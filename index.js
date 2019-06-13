@@ -111,7 +111,13 @@ function q(datalogQuery, inputs) {
 
   const hashJoin = (rel1, rel2) => {
     console.log('HASH JOIN', rel1, rel2)
-  
+
+    // create a new relation by comparing the coll values in rel2 
+    // with those in rel1, keeping only the values that match for each 
+    // logic var
+
+    let newColl = rel2.coll
+
   
   }
 
