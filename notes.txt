@@ -1,0 +1,15 @@
+
+### DataScript notes 
+
+
+query is achieved by:
+  - reduces over each clause, modifying a context variable
+  - for each clause it creates a "relation" which is a tuple of the 
+    parts of the query and the (filtered | searched) datoms that match 
+    the pattern 
+  - filtering of the coll is accomplished by
+      - mapping the array index to the value being tested
+      - filtering coll if a[i] = v
+  - each relation is hash-joined into the context
+    building up a single relation which maps across all logic vars
+  - the find specification is then evaluated on the summed relation
