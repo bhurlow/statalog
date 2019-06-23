@@ -56,3 +56,31 @@ test('find bindings', async () => {
 
   expect(res).toEqual(expected)
 })
+
+test('find bindings', async () => {
+
+  const data = [
+    [1, ':user/age', 10],
+    [2, ':user/age', 11],
+    [3, ':user/age', 10],
+    [2, ':user/follows', 1],
+    [3, ':user/follows', 1]
+  ]
+
+  let myQ = new DatalogQuery({})
+
+  let query = myQ
+    .find('?e')
+    .where('?e', ':user/follows', 1)
+
+  let res = q(query, data)
+
+  console.log('res', res)
+
+  let expected = new Set([
+    new Set([2]),
+    new Set([3]),
+  ])
+
+  expect(res).toEqual(expected)
+})

@@ -1,4 +1,5 @@
 const R = require('ramda')
+const log = require('debug')('q')
 
 const isVar = x => {
   return String(x).startsWith('?')
@@ -120,6 +121,8 @@ function q(datalogQuery, inputs) {
     const findVars = datalogQuery.findVars
     const returnSet = new Set()
 
+    log(`applying find vars ${findVars}`)
+
     const joinedRel = ctx.rels
 
     for (tuple of joinedRel.coll) {
@@ -138,14 +141,18 @@ function q(datalogQuery, inputs) {
   let reducedCtx = clauses.reduce((ctx, clause) => {
     let [e, a, v = '_'] = clause
 
+    log('creating relation for clause', clause)
     let rel = makeRel(ctx, clause)
+    log('created relation of length', rel.coll.length)
 
     if (R.isEmpty(ctx.rels)) {
       ctx.rels = rel
       return ctx
     }
 
+    log('running hash join')
     let joinedRel = hashJoinRel(ctx, rel)
+    log('completed hash join')
 
     ctx.rels = joinedRel
     return ctx
@@ -155,7 +162,9 @@ function q(datalogQuery, inputs) {
   // apply find spec
   // perform find
 
-  return applyFind(datalogQuery, reducedCtx)
+  let final = applyFind(datalogQuery, reducedCtx)
+  log('done')
+  return final
 }
 
 module.exports = q
