@@ -55,8 +55,6 @@ function q(datalogQuery, inputs) {
     inputs
   }
 
-  console.log('initial context', context)
-
   // given an index mapping of matching positions
   // filter the input to only datoms that match those
   // this would incur a db search if supported
@@ -109,16 +107,51 @@ function q(datalogQuery, inputs) {
     }
   }
 
+  // create a new relation by comparing the coll values in rel2
+  // with those in rel1, keeping only the values that match for each
+  // logic var
+  // TODO hash against the smaller collection
   const hashJoin = (rel1, rel2) => {
-    console.log('HASH JOIN', rel1, rel2)
+    let combinedSyms = R.uniq(R.concat(rel1.symbols, rel2.symbols))
+    let sharedSyms = R.intersection(rel1.symbols, rel2.symbols)
 
-    // create a new relation by comparing the coll values in rel2 
-    // with those in rel1, keeping only the values that match for each 
-    // logic var
+    let hashTable = new Map()
 
-    let newColl = rel2.coll
+    for (bindingVar in rel1.offsetMap) {
+      hashTable.set(bindingVar, new Set())
+    }
 
-  
+    for (tuple of rel1.coll) {
+      for (bindingVar in rel1.offsetMap) {
+        let idx = rel1.offsetMap[bindingVar]
+        let value = tuple[idx]
+        hashTable.get(bindingVar).add(value)
+      }
+    }
+
+    let intersectionColl = rel2.coll.filter(tuple => {
+      let tests = []
+      for (bindingVar of sharedSyms) {
+        let idx = rel2.offsetMap[bindingVar]
+        let value = tuple[idx]
+        let test = hashTable.get(bindingVar).has(value)
+        tests.push(test)
+      }
+      return tests.every(x => !!x)
+    })
+
+    let combinedRelation = {
+      symbols: combinedSyms,
+      // what should offset map be in the case of "ref" types
+      // where the same binding var is used in both positions?
+      offsetMap: R.merge(rel1.offsetMap, rel2.offsetMap),
+      // unclear on whether the combined relation should have both
+      // relation's collections. 
+      coll: intersectionColl,
+      joined: true
+    }
+
+    return combinedRelation
   }
 
   const hashJoinRel = (ctx, rel2) => {
@@ -126,15 +159,28 @@ function q(datalogQuery, inputs) {
     return hashJoin(rel1, rel2)
   }
 
-  let reduced = clauses.reduce((ctx, clause) => {
+  const applyFind = (datalogQuery, ctx) => {
+
+    const findVars = datalogQuery.findVars
+    const returnSet = new Set()
+
+    for (tuple of ctx.coll) {
+      let row = new Set()
+      for (bindingVar of findVars) {
+        let idx = ctx.offsetMap[bindingVar]
+        let value = tuple[idx]
+        row.add(value)
+      }
+      returnSet.add(row)
+    }
+
+    return returnSet
+  }
+
+  let reducedCtx = clauses.reduce((ctx, clause) => {
     let [e, a, v = '_'] = clause
-    console.log('evaluating clause', clause)
 
     let rel = makeRel(ctx, clause)
-
-    console.log('REL', rel)
-
-    console.log('---')
 
     if (R.isEmpty(ctx.rels)) {
       ctx.rels = rel
@@ -143,26 +189,26 @@ function q(datalogQuery, inputs) {
 
     let newCtx = hashJoinRel(ctx, rel)
 
-    return ctx
+    return newCtx
     //     let filtered = inputs.filtered(datom => {
     //       let ret = false
     //       return ret
     //     })
   }, context)
 
+  // TODO
+  // apply find spec
   // perform find
 
-  return reduced
+  return applyFind(datalogQuery, reducedCtx)
 }
 
 let myQ = new DatalogQuery({})
 
 let query = myQ
-  .find('?s')
+  .find('?e', '?s')
   .where('?e', ':user/age', 50)
   .where('?e', ':user/speed', '?s')
-
-console.log(query)
 
 const data = [
   [90, ':user/age', 50],
@@ -170,7 +216,9 @@ const data = [
   [91, ':user/speed', 88],
   [93, ':user/age', 50],
   [93, ':user/speed', 4],
-  [93, ':user/size', 22]
+  [93, ':user/size', 22],
+  [94, ':user/age', 62],
+  [94, ':user/speed', 7]
 ]
 
 let res = q(query, data)
